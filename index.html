@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAST University Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #chat-container {
+            width: 400px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #header {
+            background: #004aad;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        #chat-box {
+            height: 400px;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: #fafafa;
+        }
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            font-size: 0.95em;
+            line-height: 1.4;
+        }
+        .user-message {
+            background: #004aad;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+        .bot-message {
+            background: #e0e0e0;
+            color: #333;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+        }
+        #input-area {
+            display: flex;
+            padding: 10px;
+            background: white;
+            border-top: 1px solid #ddd;
+        }
+        #user-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            outline: none;
+        }
+        #send-btn {
+            background: #004aad;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin-left: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #send-btn:hover {
+            background: #003680;
+        }
+    </style>
+</head>
+<body>
+
+<div id="chat-container">
+    <div id="header">FAST Chatbot</div>
+    <div id="chat-box">
+        <div class="message bot-message">Hello! I'm the FAST University chatbot. How can I help you today?</div>
+    </div>
+    <div style="background: white; border-top: 1px solid #ddd; padding: 10px;">
+        <div style="display: flex; margin-bottom: 10px; font-size: 0.9em;">
+            <input type="file" id="pdf-upload" accept=".pdf" style="flex: 1;">
+            <button onclick="uploadPDF()" style="background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Upload Knowledge</button>
+        </div>
+    <div style="display: flex;">
+        <input type="text" id="user-input" placeholder="Type a message..." onkeypress="handleKeyPress(event)" style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; outline: none;">
+        <button id="send-btn" onclick="sendMessage()" style="background: #004aad; color: white; border: none; padding: 10px 15px; margin-left: 10px; border-radius: 5px; cursor: pointer; font-weight: bold;">Send</button>
+    </div>
+</div>
+</div>
+
+<script>
+    const chatBox = document.getElementById("chat-box");
+    const userInput = document.getElementById("user-input");
+
+    // Allow pressing "Enter" to send message
+    function handleKeyPress(event) {
+        if (event.key === "Enter") {
+            sendMessage();
+        }
+    }
+
+    async function sendMessage() {
+        const text = userInput.value.trim();
+        if (!text) return;
+
+        // 1. Show user message in UI
+        appendMessage(text, "user-message");
+        userInput.value = ""; // Clear input field
+
+        // 2. Send POST request to FastAPI backend
+        try {
+            const response = await fetch("http://127.0.0.1:8000/chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ message: text })
+            });
+
+            if (!response.ok) {
+                throw new Error("Network response was not ok");
+            }
+
+            const data = await response.json();
+            
+            // 3. Show bot response in UI
+            appendMessage(data.reply, "bot-message");
+
+        } catch (error) {
+            console.error("Error:", error);
+            appendMessage("Sorry, I couldn't connect to the server. Is the FastAPI backend running?", "bot-message");
+        }
+    }
+
+    // Upload PDF Function 
+    async function uploadPDF() {
+        const fileInput = document.getElementById("pdf-upload");
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            alert("Please select a PDF file first.");
+            return;
+        }
+
+        appendMessage("Uploading and reading PDF... please wait.", "bot-message");
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            const response = await fetch("http://127.0.0.1:8000/upload", {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await response.json();
+            appendMessage(data.message, "bot-message");
+            fileInput.value = ""; // clear the file input
+
+        } catch (error) {
+            console.error("Error:", error);
+            appendMessage("Failed to upload the document.", "bot-message");
+        }
+    }
+    function appendMessage(text, className) {
+        const msgDiv = document.createElement("div");
+        msgDiv.className = `message ${className}`;
+        msgDiv.textContent = text;
+        chatBox.appendChild(msgDiv);
+        
+        // Auto-scroll to the bottom
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+</script>
+
+</body>
+</html>
