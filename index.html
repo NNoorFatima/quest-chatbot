@@ -121,32 +121,48 @@
         const text = userInput.value.trim();
         if (!text) return;
 
-        // 1. Show user message in UI
         appendMessage(text, "user-message");
-        userInput.value = ""; // Clear input field
+        userInput.value = "";
 
-        // 2. Send POST request to FastAPI backend
+        // Create bot message div upfront and stream text into it
+        const botMsgDiv = document.createElement("div");
+        botMsgDiv.className = "message bot-message";
+        botMsgDiv.textContent = "";
+        chatBox.appendChild(botMsgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
         try {
             const response = await fetch("http://127.0.0.1:8000/chat", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: text })
             });
 
-            if (!response.ok) {
-                throw new Error("Network response was not ok");
+            if (!response.ok) throw new Error("Network response was not ok");
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop(); // keep incomplete last line
+
+                for (const line of lines) {
+                    if (!line.startsWith("data: ")) continue;
+                    const payload = line.slice(6);
+                    if (payload === "[DONE]") break;
+                    botMsgDiv.textContent += JSON.parse(payload);
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                }
             }
-
-            const data = await response.json();
-            
-            // 3. Show bot response in UI
-            appendMessage(data.reply, "bot-message");
-
         } catch (error) {
             console.error("Error:", error);
-            appendMessage("Sorry, I couldn't connect to the server. Is the FastAPI backend running?", "bot-message");
+            botMsgDiv.textContent = "Sorry, I couldn't connect to the server. Is the FastAPI backend running?";
         }
     }
 
